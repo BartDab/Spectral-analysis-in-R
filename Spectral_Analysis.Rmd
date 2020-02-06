@@ -1,0 +1,85 @@
+---
+title: "Projekt - Analiza Spektralna"
+author: "Bartosz Dąbrowski"
+date: "6 02 2020"
+output: html_document
+---
+
+```{r}
+library(oce)
+library(outliers)
+library(lattice)
+library(lubridate)
+library(multitaper)
+require(multitaper)
+require(xts)
+require(forecast)
+
+```
+
+
+
+```{r}
+data<-read.csv('DAYTON_hourly.csv',header=TRUE)#,ststringsAsFactors = FALSE)
+str(data)
+data$Datetime<-as.Date(data$Datetime)
+data<-aggregate(DAYTON_MW~Datetime,data,sum)
+head(data)
+#data<-data[,-1]
+#help("as.POSIXct")
+#d2_date = as.POSIXct(data$Datetime , format = "%Y-%m-%d %H:%M:%S ")
+#data$Datetime = d2_date
+#date<-as.Date(data[1,])
+
+#help(ts)
+```
+
+```{r}
+#days <- seq(as.Date("2004-10-01 01:00:00"), as.Date("2018-08-03 00:00:00"), by = "days")
+
+#hours <- seq(from = as.POSIXct("2004-10-01 01:00"), 
+#                  to = as.POSIXct("2018-08-02 03:00"), by = "hour")
+#head(hours,20)
+#nrow(hours)
+#str(hours)
+#str(days)
+#str(data)
+#help
+#help(msts)
+#data_ts<-suppressWarnings(ts(data,c(as.numeric('2014-12-31 01:00'), as.numeric(format(hours[1], "%j"))), frequency = 24))
+#help(xts)
+#help(ets)
+#data_msts<-msts(data,seasonal.periods = c(24,24*7,24*30,24*365))
+#data2<-ts(data, start = c(2004,10),frequency=720)#24x30=720--->~monthly, it's not what it should be, but i want to check how decompose() work on this data
+#danta2 <- ts(data,start=days[1],frequency=24)
+#danta3 <- ts(data,start=hours[1],frequency=24)
+#data_ts <- xts(data, order.by = days,frequency=24)
+#data_ets<-ets(data_ts)
+
+data_ts<-ts(data$DAYTON_MW,start=c(year(min(data$Datetime)),yday(min(data$Datetime))),frequency=365)
+```
+
+```{r}
+plot(data_ts, type="l", ylab="Energy consumption",xlab="Time",col=grey(.05))
+grid()
+```
+
+```{r}
+#help(decompose)
+data_decomposed<-decompose(data_ts) #too few periods? i don't think so, but who am i to disagree with r
+#btw, tbats isn't the most effective function, according to running time...
+#data_tbats<-tbats(data_msts)
+#?ts
+plot(data_decomposed)
+#(data_tbats)
+#dane bez trendu
+#help(tbats)
+data_trend<-diff(ts(log(data_ts)))
+plot(data_trend)
+```
+
+
+
+
+
+
