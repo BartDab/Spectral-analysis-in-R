@@ -16,7 +16,7 @@ library(multitaper)
 require(multitaper)
 require(xts)
 require(forecast)
-
+library(tidyr)
 ```
 
 Dane z dokładnością godzinową mają dużą wartość, ale również mocno komplikują sprawę. Ze względu na duży zakres czasu zdecydowaliśmy się skumulować je do sum dziennych i skupić na szukaniu prawidłowości większych niż dobowe. Ostatnia obserwacja została usunięta, gdyż były to dane z 3 sierpnia 2018, zawierające zużycie energii tylko do godziny 01:00, a więc wyraźnie odstające od reszty wartości.
@@ -25,17 +25,28 @@ Dane z dokładnością godzinową mają dużą wartość, ale również mocno ko
 
 rm(list=ls())
 data<-read.csv('DAYTON_hourly.csv',header=TRUE)#,ststringsAsFactors = FALSE)
-str(data)
+
 data$Datetime<-as.Date(data$Datetime)
-data<-aggregate(DAYTON_MW~Datetime,data,sum)
-data<-data[1:5054,]
+str(data)
+
+
+data <- separate(data,Datetime,
+               into=c("Year","Month","Day"),
+               sep="-")
+
+data$Day<-rep(1,121275)
+
+data<-unite(data,Date,into=c("Year","Month","Day"),sep="-")
+
+data<-aggregate(DAYTON_MW~Date,data,sum)
+data<-data[1:166,] #throwing out last month because it lasts only 49 hours in our dataset
 head(data)
 ```
 
 W oparciu o pakiet __lubridate__ tworzymy szereg czasowy z naszych danych.
 
 ```{r}
-data_ts<-ts(data$DAYTON_MW,start=c(year(min(data$Datetime)),yday(min(data$Datetime))),frequency=365)
+data_ts<-ts(data$DAYTON_MW,start=c(year(min(data$Date)),yday(min(data$Date))),frequency=12)
 ```
 
 Wizualizujemy dane. Ostatnia obserwacja została usunięte
@@ -83,24 +94,20 @@ lines(d4, col="orange")
 f5<-c(1/5,1/5,1/5,1/5,1/5)
 d5 <-filter(data_trend,f5,sides=2)
 lines(d5, col="green")
-#wygladzanie srednia ruchoma rzedu 7
-f7<-rep(1/7,7)
-d7<-filter(data_trend,f7,sides=2)
-lines(d7,col="brown")
-#wygladzanie srednia ruchoma rzedu 10
-f10<-rep(1/10,10)
-d10<-filter(data_trend,f10,sides=2)
-lines(d10,col="purple")
-#wygladzanie srednia ruchoma rzedu 365
-f365<-rep(1/365,365)
-d365<-filter(data_trend,f365,sides=2)
-lines(d365,col="red")
+#wygladzanie srednia ruchoma rzedu 6
+f6<-rep(1/6,6)
+d6<-filter(data_trend,f6,sides=2)
+lines(d6,col="brown")
+#wygladzanie srednia ruchoma rzedu 12
+f12<-rep(1/12,12)
+d12<-filter(data_trend,f12,sides=2)
+lines(d12,col="purple")
 ```
 
 Najlepiej sprawuje się 
 
 ```{r}
-dane3<-d365[183:4870]
+dane3<-d12[6:159]
 plot(dane3,type="l",col="red")
 
 #DO SPRAWDZENIA
@@ -109,10 +116,10 @@ plot(dane3,type="l",col="red")
 
 ```{r}
 #PERIODOGRAM NAIWNY:
-P<- spec.pgram(data,log='no', taper=0,pad=0, fast=FALSE,demean=FALSE,detrend=TRUE)
-abline(v=1/180,lty='dotted',col="red")
-abline(v=0.142,lty='dotted',col="grey")
-abline(v=0.285,lty='dotted',col="grey")
+P<- spec.pgram(data[,2],log='no', taper=0,pad=0, fast=FALSE,demean=FALSE,detrend=TRUE)
+abline(v=1/6,lty='dotted',col="red")
+abline(v=0.415,lty='dotted',col="grey")
+#abline(v=0.285,lty='dotted',col="grey")
 ```
 
 
