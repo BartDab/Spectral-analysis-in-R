@@ -1,13 +1,13 @@
 ---
 title: "Projekt - Analiza Spektralna"
-author: "Bartosz Dąbrowski"
+author: "Bartosz Dąbrowski, Michał Kędra"
 date: "6 02 2020"
 output: html_document
 ---
 
 Dane pochodzą z serwisu kaggle.com, zawierającego, pośród wielu różnych wartościowych materiałów, zbiory danych do przeprwoadzania własnych analiz. Wykorzystywany przez nas dataset to informacje dotyczące godzinowego zużycia energii w megawatach (MW) z kilku stanów USA, w których za dystrybucję odpowiedzialny było PJM Interconnection LLC, pobrane ze strony przedsiębiorstwa. Zdecydowaliśmy się na analizę zużycia energii w mieście Dayton, w stanie Ohio - liczącym ok. 170 tys. mieszkańców (850 tys. w ramach obszaru metropolitarnego).
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 library(oce)
 library(outliers)
 library(lattice)
