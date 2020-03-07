@@ -17,27 +17,21 @@ require(multitaper)
 require(xts)
 require(forecast)
 library(tidyr)
+library(ramify)
 ```
 
-Dane z dokładnością godzinową mają dużą wartość, ale również mocno komplikują sprawę. Ze względu na duży zakres czasu zdecydowaliśmy się skumulować je do sum dziennych i skupić na szukaniu prawidłowości większych niż dobowe. Ostatnia obserwacja została usunięta, gdyż były to dane z 3 sierpnia 2018, zawierające zużycie energii tylko do godziny 01:00, a więc wyraźnie odstające od reszty wartości.
+Dane z dokładnością godzinową mają dużą wartość, ale również mocno komplikują sprawę. Ze względu na duży zakres czasu zdecydowaliśmy się skumulować je do sum miesięcznych. Ostatnia obserwacja została usunięta, gdyż były to dane z 3 sierpnia 2018, zawierające zużycie energii tylko do godziny 01:00, a więc wyraźnie odstające od reszty wartości.
 
 ```{r}
-
 rm(list=ls())
 data<-read.csv('DAYTON_hourly.csv',header=TRUE)#,ststringsAsFactors = FALSE)
-
 data$Datetime<-as.Date(data$Datetime)
 str(data)
-
-
 data <- separate(data,Datetime,
                into=c("Year","Month","Day"),
                sep="-")
-
-data$Day<-rep(1,121275)
-
+data$Day<-rep(1,nrow(data))
 data<-unite(data,Date,into=c("Year","Month","Day"),sep="-")
-
 data<-aggregate(DAYTON_MW~Date,data,sum)
 data<-data[1:166,] #throwing out last month because it lasts only 49 hours in our dataset
 head(data)
@@ -46,10 +40,12 @@ head(data)
 W oparciu o pakiet __lubridate__ tworzymy szereg czasowy z naszych danych.
 
 ```{r}
-data_ts<-ts(data$DAYTON_MW,start=c(year(min(data$Date)),yday(min(data$Date))),frequency=12)
+#data_ts<-ts(data$DAYTON_MW,start=c(year(min(data$Date)),yday(min(data$Date))),frequency=12)
+data_ts<-ts(data$DAYTON_MW,start=2004,frequency=12)
+
 ```
 
-Wizualizujemy dane. Ostatnia obserwacja została usunięte
+Wizualizujemy dane.
 
 ```{r}
 plot(data_ts, type="l", ylab="Energy consumption",xlab="Time",col=grey(.05))
@@ -71,55 +67,136 @@ Tworzymy periodogram naiwny dla danych bez trendu.
 periodogram <- spec.pgram(data_trend,log='no', taper=0,pad=0, fast=FALSE,demean=FALSE,detrend=TRUE)
 ```
 
-Widoczne są wyraźne piki dla 3 wartości - w przybliżeniu 0,14 (cykl tygodniowy), 0,28 oraz 0,43 (cykl ok 2,5- i 3,5-dobowe). O ile pozostałe 2 wydają się dość nieoczywiste, główny jest jak najbardziej naturalny i logiczny.
+Widoczne są wyraźne piki dla 3 wartości - w przybliżeniu 1/6 (cykl półroczny), 0,25 (4-miesięczny) oraz 0,42 (cykl ok 2,5-miesięczny). O ile ostatniee 2 wydają się dość nieoczywiste, główny jest jak najbardziej naturalny i logiczny.
 
 ```{r}
-#WYGLADZANIE SREDNIA RUCHOMA:
-#tu myślę czy nie rozdziliB
 plot(data_trend,type="l")
 grid()
-#wygladzenie srednia ruchoma rzedu 2
+
 f2<-c(1/4,0.5,1/4)
 d2 <-filter(data_trend,f2,sides=2)
 lines(d2, col="yellow")
-#wygladzenie srednia ruchoma rzedu 3
+
 f3<-c(1/3,1/3,1/3)
 d3<-filter(data_trend,f3,sides=2)
 lines(d3, col="blue")
-#wygladzenie srednia ruchoma rzedu 4
+
 f4<-c(1/8,1/4,1/4,1/4,1/8)
 d4 <-filter(data_trend,f4,sides=2)
 lines(d4, col="orange")
-#wygladzenie srednia ruchoma rzedu 5
+
 f5<-c(1/5,1/5,1/5,1/5,1/5)
 d5 <-filter(data_trend,f5,sides=2)
-lines(d5, col="green")
-#wygladzanie srednia ruchoma rzedu 6
+lines(d5, col="brown")
+
 f6<-rep(1/6,6)
 d6<-filter(data_trend,f6,sides=2)
-lines(d6,col="brown")
-#wygladzanie srednia ruchoma rzedu 12
+lines(d6,col="green")
+
 f12<-rep(1/12,12)
 d12<-filter(data_trend,f12,sides=2)
 lines(d12,col="purple")
+
+f20<-rep(1,20)/20
+d20 <- filter(data_trend,f20,sides=2)
+lines(d20, col="red")
+
 ```
 
-Najlepiej sprawuje się 
+Najlepisze wyniki uzyskało wygładzenie średnią o długości 12, które prezentuje się następująco:
 
 ```{r}
 dane3<-d12[6:159]
-plot(dane3,type="l",col="red")
-
-#DO SPRAWDZENIA
-
+plot(dane3,type="l",col="purple")
 ```
 
 ```{r}
-#PERIODOGRAM NAIWNY:
 P<- spec.pgram(data[,2],log='no', taper=0,pad=0, fast=FALSE,demean=FALSE,detrend=TRUE)
-abline(v=1/6,lty='dotted',col="red")
+abline(v=0.169,lty='dotted',col="red")
 abline(v=0.415,lty='dotted',col="grey")
-#abline(v=0.285,lty='dotted',col="grey")
+abline(v=0.084,lty='dotted',col="green")
 ```
+
+Periodogram naiwny ukazuje 3 wyróżniające się piki - największy, __0.169__, oznacza cykl półroczny, drugi, mniejszy, choć wyróżniający się na tle reszty, dla __0.415__, oznacza cykl ok. 2,5-miesięczny, trzeci, minimalnie wybijający sę ponad wahania wartości, dla __0.084__, a więc cyklu rocznego.
+
+```{r}
+par(mfrow=c(3,2))
+window_1<-kernel('daniell',3)
+window_2<-kernel('daniell',6)
+window_3<-kernel('daniell',c(2,2))
+plot(window_1)
+P1<-spec.pgram(data[,2],kernel=window_1,log='no',taper=0,fast=F,detrend=T)
+abline(v=1/6,lty='dotted',col="red")
+plot(window_2)
+spec.pgram(data[,2],kernel=window_2,log='no',taper=0,fast=F,detrend=T)
+abline(v=1/6,lty='dotted',col="red")
+plot(window_3)
+spec.pgram(data[,2],kernel=window_3,log='no',taper=0,fast=F,detrend=T)
+abline(v=1/6,lty='dotted',col="red")
+```
+
+Wygładzanie oknem Daniella potwierdza, że dominujący jest cykl półroczny. Widać to na oknie (2,2), bo 3 oraz 6 mają mniej wyraźne piki, których środek przypada w pobliżu 1/6, ale nie można stwierdzić, że na nią wskazują.
+
+```{r}
+par(mfrow=c(2,2))
+k=kernel("modified.daniell",6)
+plot(k)
+data_filter<-kernapply(data_ts,k)
+plot.ts(data_filter)
+spec.pgram(data_filter,kernel('daniell',3),log='no',taper=0,fast=F)
+```
+
+Po odfiltrowaniu częstotliwości 6-miesięcznej, nie widać znaczących pików poza przedziałem <0,1>.
+
+
+```{r, warning=FALSE}
+require(oce)
+datawelch<-ts(data,frequency=12)
+datawelch<-datawelch-mean(datawelch)
+P2<-pwelch(data_ts,noverlap=10,plot=FALSE)
+plot(P2$freq,P2$spec,type="l")
+abline(v=1.8,lty='dotted',col="grey")
+```
+
+Na periodogramie Welcha maksimum znajduje się w punkcie __1.8__.
+
+Periodogramy naiwny oraz Welcha na 1 wykresie, wraz z zaznaczonymi pikami:
+
+```{r, warning=FALSE}
+spec.pgram(data_ts,log='no',taper=0,fast=T)
+lines(P2$freq,P2$spec,type="l", col="red")
+abline(v=2,lty='dotted',col="grey")
+abline(v=1.8,lty='dotted',col="grey")
+```
+
+```{r}
+require(multitaper)
+dane5<-as.ts(read.table("dayton.csv")) #importing data without date column
+freq<-seq(from=0,to=1, length=length(dane5[,1]))
+uu<-as.ts(dane5[,1])
+uu<-uu-mean(uu)
+P6<-abs(fft(uu))^2/(2*pi*length(uu))
+L<-qchisq(.2,2)
+U<-qchisq(.8,2)
+plot(freq,log(P6),type="l",ylim=c(0, 15))
+D<-as.matrix(2*P6/L)
+G<-as.matrix(2*P6/U)
+lines(freq,log(G),type="l",col="blue")
+lines(freq,log(D),type="l",col="red")
+Spec2<-spec.mtm(dane5,Ftest=TRUE)
+plot(Spec2,Ftest=TRUE,siglines=c(0.90,0.99))
+```
+
+Na poziomie istotności alfa = __0.01__ wyróżniają się 0.169 (cykl 6-miesięczny) oraz 0.415 (2,5-miesięczny), z kolei dla alfa = __0.1__ - 0.25 (4-miesięczny) oraz 0.35 (w przybliżeniu kwartalny), 0.21 (5-miesięczny) i 0.1 (10-miesięczny).
+
+Wyznaczone przedziały ufności:
+
+```{r}
+Spec2<-spec.mtm(dane5,Ftest=TRUE,jackknife=TRUE)
+```
+
+
+
+
 
 
